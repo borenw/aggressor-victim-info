@@ -76,11 +76,12 @@ Worst-case coupling uses <b>dV max</b> and <b>R<sub>out</sub> min</b>.</p>
 <b>d</b> = center-to-center spacing to aggressor. Worst-case uses <b>R<sub>in</sub> min</b> and <b>C<sub>in</sub> min</b>.</p>
 <div class="card tblwrap">
 <table class="ctab" id="victTbl"><thead><tr>
-  <th>Receiver IC</th><th>Rx pad</th><th>Function</th>
+  <th>Receiver IC</th><th>Rx pad</th><th>Function</th><th>Filter</th><th>f<sub>c</sub> (MHz)</th>
   <th>V<sub>err</sub> (mV)</th><th>R<sub>in</sub> (Ω)</th><th class="mm">R<sub>in</sub> min</th><th class="mm">R<sub>in</sub> max</th>
   <th>C<sub>in</sub> (pF)</th><th class="mm">C<sub>in</sub> min</th><th class="mm">C<sub>in</sub> max</th>
   <th>d to aggr (µm)</th><th>W (µm)</th><th>T (µm)</th><th>L (µm)</th><th></th></tr></thead><tbody></tbody></table>
 <button class="add" id="addVict">+ Add victim</button>
+<div style="font-size:12.5px;color:#5E6C84;margin-top:6px">🔎 <b>Filter</b> = the receiver front-end that rejects coupled HF noise (<code>all-pass</code> = none; <code>brick-LPF</code> / <code>1-pole RC</code> at <b>f<sub>c</sub></b>). Default <b>all-pass</b>; <b>ISEN_CS*</b> pads auto-set to a <b>10&nbsp;MHz brick-LPF</b>. Exported in the CSV (<code>filter, fc_MHz</code>).</div>
 </div>
 
 <h2>4 · Save / export</h2>
@@ -104,7 +105,7 @@ Worst-case coupling uses <b>dV max</b> and <b>R<sub>out</sub> min</b>.</p>
   var AKEYS=[['dV'],['dVmin'],['dVmax'],['dVdt'],['f'],['Rout'],['Routmin'],['Routmax'],['w'],['t'],['len']];
   var VKEYS=[['Verr'],['Rin'],['Rinmin'],['Rinmax'],['Cin'],['Cinmin'],['Cinmax'],['d'],['w'],['t'],['len']];
   function A(ic,pad,fn,dV,dVdt,f,Rout,w,t,len,ex){var r={ic:ic,pad:pad,fn:fn,dV:dV,dVmin:'',dVmax:'',dVdt:dVdt,f:f,Rout:Rout,Routmin:'',Routmax:'',w:w,t:t,len:len};if(ex)for(var k in ex)r[k]=ex[k];return r;}
-  function V(ic,pad,fn,Verr,Rin,Cin,d,w,t,len,ex){var r={ic:ic,pad:pad,fn:fn,Verr:Verr,Rin:Rin,Rinmin:'',Rinmax:'',Cin:Cin,Cinmin:'',Cinmax:'',d:d,w:w,t:t,len:len};if(ex)for(var k in ex)r[k]=ex[k];return r;}
+  function V(ic,pad,fn,Verr,Rin,Cin,d,w,t,len,ex){var cs=/isen_cs/i.test(pad);var r={ic:ic,pad:pad,fn:fn,filt:cs?'brick-LPF':'all-pass',fc:cs?10:'',Verr:Verr,Rin:Rin,Rinmin:'',Rinmax:'',Cin:Cin,Cinmin:'',Cinmax:'',d:d,w:w,t:t,len:len};if(ex)for(var k in ex)r[k]=ex[k];return r;}
 
   // ---------------- popular-IC macros ----------------
   var MACROS={
@@ -148,10 +149,14 @@ Worst-case coupling uses <b>dV max</b> and <b>R<sub>out</sub> min</b>.</p>
   function renderAggr(){document.querySelector('#aggrTbl tbody').innerHTML=AGGR.map(function(r,i){return '<tr data-i="'+i+'">'+
     '<td>'+icSel(r.ic)+'</td><td><input class="tin tpad pad" value="'+esc(r.pad)+'"></td><td>'+fnSel(r.fn)+'</td>'+
     AKEYS.map(function(k){return '<td>'+ti(r[k[0]])+'</td>';}).join('')+'<td><button class="del">✕</button></td></tr>';}).join('');}
+  function filtSel(c){var O=['all-pass','brick-LPF','1-pole RC'];c=c||'all-pass';return '<select class="filt">'+O.map(function(o){return '<option'+(o===c?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';}
   function renderVict(){document.querySelector('#victTbl tbody').innerHTML=VICT.map(function(r,i){return '<tr data-i="'+i+'">'+
     '<td>'+icSel(r.ic)+'</td><td><input class="tin tpad pad" value="'+esc(r.pad)+'"></td><td>'+fnSel(r.fn)+'</td>'+
+    '<td>'+filtSel(r.filt)+'</td><td><input class="fc" style="width:50px;padding:5px 6px;border:1px solid #4C9AFF;border-radius:4px;font-family:monospace;font-size:13px;text-align:right" value="'+(r.fc==null?'':r.fc)+'"></td>'+
     VKEYS.map(function(k){return '<td>'+ti(r[k[0]])+'</td>';}).join('')+'<td><button class="del">✕</button></td></tr>';}).join('');}
   function readRow(tr,rec,keys){rec.ic=tr.querySelector('select.ic').value;rec.fn=tr.querySelector('select.fn').value;rec.pad=tr.querySelector('input.pad').value;
+    var fs=tr.querySelector('select.filt');if(fs)rec.filt=fs.value;
+    var fce=tr.querySelector('input.fc');if(fce){var fv=parseFloat(fce.value);rec.fc=isFinite(fv)?fv:'';}
     var tins=tr.querySelectorAll('input.tin:not(.pad)');
     keys.forEach(function(k,ix){var raw=(tins[ix].value||'').trim();
       if(/min$|max$/.test(k[0])){rec[k[0]]=(raw===''||!isFinite(parseFloat(raw)))?'':parseFloat(raw);}
@@ -162,8 +167,8 @@ Worst-case coupling uses <b>dV max</b> and <b>R<sub>out</sub> min</b>.</p>
   function toCSV(){sync();var q=function(x){return (x===''||x==null)?'':x;};
     var a='# AGGRESSORS\nIC,pad,function,dV,dVmin,dVmax,dVdt,f,Rout,Routmin,Routmax,W,T,L\n'+
       AGGR.map(function(r){return [r.ic,r.pad,r.fn,r.dV,q(r.dVmin),q(r.dVmax),r.dVdt,r.f,r.Rout,q(r.Routmin),q(r.Routmax),r.w,r.t,r.len].join(',');}).join('\n');
-    var v='# VICTIMS\nIC,pad,function,Verr,Rin,Rinmin,Rinmax,Cin,Cinmin,Cinmax,d,W,T,L\n'+
-      VICT.map(function(r){return [r.ic,r.pad,r.fn,r.Verr,r.Rin,q(r.Rinmin),q(r.Rinmax),r.Cin,q(r.Cinmin),q(r.Cinmax),r.d,r.w,r.t,r.len].join(',');}).join('\n');
+    var v='# VICTIMS\nIC,pad,function,filter,fc_MHz,Verr,Rin,Rinmin,Rinmax,Cin,Cinmin,Cinmax,d,W,T,L\n'+
+      VICT.map(function(r){return [r.ic,r.pad,r.fn,(r.filt||'all-pass'),q(r.fc),r.Verr,r.Rin,q(r.Rinmin),q(r.Rinmax),r.Cin,q(r.Cinmin),q(r.Cinmax),r.d,r.w,r.t,r.len].join(',');}).join('\n');
     return a+'\n\n'+v+'\n';}
   function refresh(){renderAggr();renderVict();document.getElementById('csvOut').value=toCSV();}
   function preview(){document.getElementById('csvOut').value=toCSV();}
@@ -177,6 +182,10 @@ Worst-case coupling uses <b>dV max</b> and <b>R<sub>out</sub> min</b>.</p>
     el.addEventListener('input',preview);el.addEventListener('change',preview);
     el.addEventListener('click',function(e){if(e.target.classList.contains('del')){var i=+e.target.closest('tr').dataset.i;
       (id==='aggrTbl'?AGGR:VICT).splice(i,1);refresh();}});});
+  document.getElementById('victTbl').addEventListener('change',function(e){
+    if(e.target.classList&&e.target.classList.contains('pad')){sync();var ch=false;
+      VICT.forEach(function(v){if(/isen_cs/i.test(v.pad)&&(v.filt||'all-pass')==='all-pass'){v.filt='brick-LPF';v.fc=10;ch=true;}});
+      if(ch)refresh();}});
   document.getElementById('addAggr').addEventListener('click',function(){AGGR.push(A('Else','NEW','PWM',1,5,1,50,150,35,5000));refresh();});
   document.getElementById('addVict').addEventListener('click',function(){VICT.push(V('Else','NEW','analog-Vsense',10,1000,5,500,150,35,5000));refresh();});
   document.getElementById('csvDl').addEventListener('click',function(){var b=new Blob([toCSV()],{type:'text/csv'}),u=URL.createObjectURL(b),
