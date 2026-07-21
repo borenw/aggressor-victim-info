@@ -1,0 +1,195 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aggressor / Victim Info Builder — SI Crosstalk</title>
+<style>
+ *{box-sizing:border-box}
+ body{margin:0;background:#F4F5F7;color:#172B4D;font-family:'Segoe UI',Arial,sans-serif;line-height:1.5}
+ .wrap{max-width:1280px;margin:0 auto;padding:0 18px 60px}
+ .banner{background:#0052CC;color:#fff;padding:20px 26px;border-radius:0 0 6px 6px;box-shadow:0 2px 6px rgba(9,30,66,.18)}
+ .banner h1{margin:0;font-size:22px;font-weight:600}
+ .banner p{margin:7px 0 0;opacity:.92;font-size:14px;max-width:960px}
+ h2{background:#0052CC;color:#fff;padding:8px 14px;border-radius:4px;font-size:17px;margin:30px 0 10px}
+ p{font-size:14px}
+ .card{background:#fff;border:1px solid #DFE1E6;border-radius:8px;padding:16px;margin:14px 0;box-shadow:0 1px 2px rgba(9,30,66,.06)}
+ .macros{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+ .macros button{border:1px solid #0052CC;background:#fff;color:#0052CC;border-radius:8px;padding:10px 14px;font-size:13.5px;font-weight:600;cursor:pointer}
+ .macros button:hover{background:#0052CC;color:#fff}
+ .macros button.clr{border-color:#C1C7D0;color:#5E6C84}
+ .macros button.clr:hover{background:#EBECF0;color:#172B4D}
+ .macro-desc{font-size:12.5px;color:#5E6C84;margin-top:8px}
+ .tblwrap{overflow-x:auto}
+ table.ctab{border-collapse:collapse;width:100%;font-size:12.5px;min-width:920px}
+ table.ctab th{background:#DEEBFF;text-align:left;padding:6px 7px;border:1px solid #B3D4FF;white-space:nowrap;font-size:11.5px}
+ table.ctab td{padding:3px 5px;border:1px solid #DFE1E6}
+ .tin{width:64px;border:1px solid #C1C7D0;border-radius:4px;padding:4px 5px;font-size:12px;font-variant-numeric:tabular-nums}
+ .tin.tpad{width:104px}
+ select.ic,select.fn{border:1px solid #C1C7D0;border-radius:4px;padding:4px;font-size:12px;background:#fff}
+ th.mm{background:#EAF6FF;color:#0747A6}
+ .del{border:none;background:#FFEBE6;color:#DE350B;border-radius:4px;padding:3px 7px;cursor:pointer;font-weight:700}
+ .btn{border:1px solid #0052CC;background:#0052CC;color:#fff;border-radius:6px;padding:8px 13px;font-size:13px;font-weight:600;cursor:pointer;margin:3px 4px 0 0}
+ .btn.sec{background:#fff;color:#0052CC}
+ .add{border:1px dashed #0052CC;background:#F4F8FF;color:#0052CC;border-radius:6px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:8px}
+ textarea{width:100%;font-family:Consolas,monospace;font-size:12px;border:1px solid #B3D4FF;border-radius:6px;padding:8px;min-height:150px}
+ .ok{color:#1f8a58;font-weight:600;font-size:12.5px;margin-left:8px}
+ .note{background:#E3FCEF;border-left:4px solid #36B37E;padding:9px 14px;border-radius:4px;font-size:13px;margin:10px 0}
+ code{background:#EBECF0;border-radius:3px;padding:1px 5px;font-family:Consolas,monospace;font-size:12px}
+ a{color:#0052CC}
+ footer{max-width:900px;margin:40px auto 24px;padding:16px 20px;border-top:1px solid #d6dbe3;font:14px Georgia,serif;color:#5a6472;text-align:center}
+ .legend{font-size:12px;color:#5E6C84;margin:4px 0 0}
+</style></head><body>
+<div class="banner">
+  <h1>🧲 Aggressor / Victim Info Builder</h1>
+  <p>Type &amp; save the <b>aggressor</b> (noise driver) and <b>victim</b> (sensitive receiver) pad info for an
+  IC or module — or one click a <b>macro</b> for a popular IC. Every R/C/dV takes an optional
+  <b>min / max</b> (blank ⇒ use the single value). Export the <b>CSV</b> and load it into the
+  <a href="https://borenw.github.io/inductive-crosstalk/#csvio" target="_blank">Inductive-Crosstalk Spec Checker</a>.</p>
+</div>
+<div class="wrap">
+
+<h2>1 · Macros — auto-fill a popular IC / module</h2>
+<div class="card">
+  <div class="macros" id="macros">
+    <button data-m="buck">⚡ Multiphase Buck / Boost</button>
+    <button data-m="codec">🎧 Audio Codec</button>
+    <button data-m="ddr">🧠 DDR5 Memory Interface</button>
+    <button data-m="motor">🌀 BLDC Motor Gate Driver</button>
+    <button data-m="clear" class="clr">✕ Clear all</button>
+  </div>
+  <div class="macro-desc" id="macroDesc">Pick a macro to populate the tables below, then edit any cell. Macros <b>replace</b> the current rows.</div>
+</div>
+
+<h2>2 · Aggressor info <span style="font-weight:400;font-size:13px">— driver pads that inject noise</span></h2>
+<p class="legend">First column IC owner: <b>1 Controller · 2 SPS · 3 Host · 4 Else</b>.
+<b>dV</b> = output swing, <b>R<sub>out</sub></b> = driver output R (sets peak loop current), <b>W·T·L</b> = trace geometry (µm).
+Worst-case coupling uses <b>dV max</b> and <b>R<sub>out</sub> min</b>.</p>
+<div class="card tblwrap">
+<table class="ctab" id="aggrTbl"><thead><tr>
+  <th>Driver IC</th><th>Driver pad</th><th>Function</th>
+  <th>dV (V)</th><th class="mm">dV min</th><th class="mm">dV max</th><th>dV/dt (V/ns)</th><th>f (MHz)</th>
+  <th>R<sub>out</sub> (Ω)</th><th class="mm">R<sub>out</sub> min</th><th class="mm">R<sub>out</sub> max</th>
+  <th>W (µm)</th><th>T (µm)</th><th>L (µm)</th><th></th></tr></thead><tbody></tbody></table>
+<button class="add" id="addAggr">+ Add aggressor</button>
+</div>
+
+<h2>3 · Victim info <span style="font-weight:400;font-size:13px">— receiver pads to protect</span></h2>
+<p class="legend"><b>V<sub>err</sub></b> = noise tolerance (pass/fail limit), <b>R<sub>in</sub>·C<sub>in</sub></b> = receiver low-pass,
+<b>d</b> = center-to-center spacing to aggressor. Worst-case uses <b>R<sub>in</sub> min</b> and <b>C<sub>in</sub> min</b>.</p>
+<div class="card tblwrap">
+<table class="ctab" id="victTbl"><thead><tr>
+  <th>Receiver IC</th><th>Rx pad</th><th>Function</th>
+  <th>V<sub>err</sub> (mV)</th><th>R<sub>in</sub> (Ω)</th><th class="mm">R<sub>in</sub> min</th><th class="mm">R<sub>in</sub> max</th>
+  <th>C<sub>in</sub> (pF)</th><th class="mm">C<sub>in</sub> min</th><th class="mm">C<sub>in</sub> max</th>
+  <th>d to aggr (µm)</th><th>W (µm)</th><th>T (µm)</th><th>L (µm)</th><th></th></tr></thead><tbody></tbody></table>
+<button class="add" id="addVict">+ Add victim</button>
+</div>
+
+<h2>4 · Save / export</h2>
+<div class="card">
+  <button class="btn" id="csvCopy">📋 Copy CSV</button>
+  <button class="btn" id="csvDl">📤 Download .csv</button>
+  <a class="btn sec" href="https://borenw.github.io/inductive-crosstalk/#csvio" target="_blank" style="text-decoration:none;display:inline-block">↗ Open Crosstalk Checker</a>
+  <span class="ok" id="msg"></span>
+  <div class="note" style="margin-top:10px">Paste this into the checker's <b>Import</b> box (or Download and Browse). Section markers
+  <code>#&nbsp;AGGRESSORS</code> / <code>#&nbsp;VICTIMS</code> and the header rows are what the parser reads; blank min/max cells fall back to the single value.</div>
+  <textarea id="csvOut" readonly></textarea>
+</div>
+
+<footer><a href="https://borenw.github.io/" style="color:#0052CC;text-decoration:none;font-weight:600">Page 32 · Bo's Engineering Curriculum</a></footer>
+</div>
+
+<script>
+(function(){
+  var IC=['Controller','SPS','Host','Else'], ICN={Controller:'1. Controller',SPS:'2. SPS',Host:'3. Host',Else:'4. Else'};
+  var FN=['PWM','digital-hs','power/gnd','analog-drive','current-sense','analog-Vsense'];
+  var AKEYS=[['dV'],['dVmin'],['dVmax'],['dVdt'],['f'],['Rout'],['Routmin'],['Routmax'],['w'],['t'],['len']];
+  var VKEYS=[['Verr'],['Rin'],['Rinmin'],['Rinmax'],['Cin'],['Cinmin'],['Cinmax'],['d'],['w'],['t'],['len']];
+  function A(ic,pad,fn,dV,dVdt,f,Rout,w,t,len,ex){var r={ic:ic,pad:pad,fn:fn,dV:dV,dVmin:'',dVmax:'',dVdt:dVdt,f:f,Rout:Rout,Routmin:'',Routmax:'',w:w,t:t,len:len};if(ex)for(var k in ex)r[k]=ex[k];return r;}
+  function V(ic,pad,fn,Verr,Rin,Cin,d,w,t,len,ex){var r={ic:ic,pad:pad,fn:fn,Verr:Verr,Rin:Rin,Rinmin:'',Rinmax:'',Cin:Cin,Cinmin:'',Cinmax:'',d:d,w:w,t:t,len:len};if(ex)for(var k in ex)r[k]=ex[k];return r;}
+
+  // ---------------- popular-IC macros ----------------
+  var MACROS={
+    buck:{ desc:'Multiphase buck/boost: controller PWM + SPS switch-node aggressors; ISEN current-sense + FB/COMP victims (µV–mV budgets). Shows R<sub>in</sub> min/max spread on the sense pads.',
+      A:[ A('Controller','PWM1_HDRV','PWM',5,10,1,100,30,10,4000),
+          A('Controller','PWM2_HDRV','PWM',5,10,1,100,30,10,4000),
+          A('SPS','SW_NODE','PWM',12,50,1,5,80,35,2000),
+          A('SPS','BOOT','PWM',12,20,1,20,40,35,1500) ],
+      V:[ V('Controller','ISEN_CS1','current-sense',1,200,1,100,30,10,150,{Rinmin:150,Rinmax:250}),
+          V('Controller','ISEN_CS2','current-sense',1,1000,1,100,30,10,150),
+          V('Controller','FB_VSEN','analog-Vsense',5,10000,10,300,30,10,800),
+          V('Controller','COMP_ITH','analog-Vsense',10,5000,100,300,30,10,800) ] },
+    codec:{ desc:'Audio codec: class-D PWM output + I²S/clock digital aggressors; mic-bias/analog-in (100 µV!), ADC V<sub>REF</sub>, and headphone victims.',
+      A:[ A('Host','CLASSD_OUTP','PWM',5,20,0.4,1,100,35,3000),
+          A('Host','I2S_BCLK','digital-hs',1.8,5,12.288,50,20,10,2000),
+          A('Host','I2S_SDATA','digital-hs',1.8,5,6,50,20,10,2000) ],
+      V:[ V('Host','AINP_MIC','analog-Vsense',0.1,2000,10,200,20,10,1500,{Rinmin:1800,Rinmax:2200}),
+          V('Host','ADC_VREF','analog-Vsense',0.5,1000,100,150,20,10,1200),
+          V('Host','HPOUT_L','analog-Vsense',1,32,1,250,60,20,2000) ] },
+    ddr:{ desc:'DDR5 memory interface: DQ/DQS/CLK high-speed digital aggressors; V<sub>REF</sub>, ZQ calibration, and analog PLL/VDDA victims.',
+      A:[ A('Host','DQ7','digital-hs',1.1,8,1600,40,15,10,1500),
+          A('Host','DQS_t','digital-hs',1.1,8,1600,40,15,10,1500),
+          A('Host','CK_t','digital-hs',1.1,8,1600,40,15,10,1800) ],
+      V:[ V('Host','VREF_CA','analog-Vsense',5,1000,100,100,15,10,1000),
+          V('Host','ZQ_CAL','analog-Vsense',10,240,5,120,15,10,900),
+          V('Host','PLL_VDDA','analog-Vsense',2,2000,50,150,15,10,1200) ] },
+    motor:{ desc:'BLDC / motor gate driver: high-/low-side gate + half-bridge phase node (15–48 V, huge dV/dt) aggressors; shunt current-sense amp, Hall/position, and bias-sense victims.',
+      A:[ A('SPS','HO_GATE','PWM',15,50,0.02,2,60,35,2500),
+          A('SPS','PHASE_SW','PWM',48,100,0.02,1,120,70,2000),
+          A('SPS','LO_GATE','PWM',15,50,0.02,2,60,35,2500) ],
+      V:[ V('Controller','ISHUNT_INP','current-sense',0.5,1000,1,150,30,35,200,{Rinmin:800,Rinmax:1200,Cinmin:0.5,Cinmax:1.5}),
+          V('Controller','HALL_A','analog-Vsense',5,10000,10,500,30,35,600),
+          V('Controller','VDD_SENSE','analog-Vsense',10,5000,100,600,30,35,600) ] }
+  };
+
+  var AGGR=[], VICT=[];
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+  function icSel(c){return '<select class="ic">'+IC.map(function(o){return '<option value="'+o+'"'+(o===c?' selected':'')+'>'+ICN[o]+'</option>';}).join('')+'</select>';}
+  function fnSel(c){return '<select class="fn">'+FN.map(function(o){return '<option'+(o===c?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';}
+  function ti(v){return '<input class="tin" value="'+(v==null?'':v)+'">';}
+  function renderAggr(){document.querySelector('#aggrTbl tbody').innerHTML=AGGR.map(function(r,i){return '<tr data-i="'+i+'">'+
+    '<td>'+icSel(r.ic)+'</td><td><input class="tin tpad pad" value="'+esc(r.pad)+'"></td><td>'+fnSel(r.fn)+'</td>'+
+    AKEYS.map(function(k){return '<td>'+ti(r[k[0]])+'</td>';}).join('')+'<td><button class="del">✕</button></td></tr>';}).join('');}
+  function renderVict(){document.querySelector('#victTbl tbody').innerHTML=VICT.map(function(r,i){return '<tr data-i="'+i+'">'+
+    '<td>'+icSel(r.ic)+'</td><td><input class="tin tpad pad" value="'+esc(r.pad)+'"></td><td>'+fnSel(r.fn)+'</td>'+
+    VKEYS.map(function(k){return '<td>'+ti(r[k[0]])+'</td>';}).join('')+'<td><button class="del">✕</button></td></tr>';}).join('');}
+  function readRow(tr,rec,keys){rec.ic=tr.querySelector('select.ic').value;rec.fn=tr.querySelector('select.fn').value;rec.pad=tr.querySelector('input.pad').value;
+    var tins=tr.querySelectorAll('input.tin:not(.pad)');
+    keys.forEach(function(k,ix){var raw=(tins[ix].value||'').trim();
+      if(/min$|max$/.test(k[0])){rec[k[0]]=(raw===''||!isFinite(parseFloat(raw)))?'':parseFloat(raw);}
+      else{var v=parseFloat(raw);rec[k[0]]=isFinite(v)?v:0;}});}
+  function sync(){document.querySelectorAll('#aggrTbl tbody tr').forEach(function(tr){readRow(tr,AGGR[+tr.dataset.i],AKEYS);});
+    document.querySelectorAll('#victTbl tbody tr').forEach(function(tr){readRow(tr,VICT[+tr.dataset.i],VKEYS);});}
+
+  function toCSV(){sync();var q=function(x){return (x===''||x==null)?'':x;};
+    var a='# AGGRESSORS\nIC,pad,function,dV,dVmin,dVmax,dVdt,f,Rout,Routmin,Routmax,W,T,L\n'+
+      AGGR.map(function(r){return [r.ic,r.pad,r.fn,r.dV,q(r.dVmin),q(r.dVmax),r.dVdt,r.f,r.Rout,q(r.Routmin),q(r.Routmax),r.w,r.t,r.len].join(',');}).join('\n');
+    var v='# VICTIMS\nIC,pad,function,Verr,Rin,Rinmin,Rinmax,Cin,Cinmin,Cinmax,d,W,T,L\n'+
+      VICT.map(function(r){return [r.ic,r.pad,r.fn,r.Verr,r.Rin,q(r.Rinmin),q(r.Rinmax),r.Cin,q(r.Cinmin),q(r.Cinmax),r.d,r.w,r.t,r.len].join(',');}).join('\n');
+    return a+'\n\n'+v+'\n';}
+  function refresh(){renderAggr();renderVict();document.getElementById('csvOut').value=toCSV();}
+  function preview(){document.getElementById('csvOut').value=toCSV();}
+
+  document.getElementById('macros').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var m=b.dataset.m;
+    if(m==='clear'){AGGR=[];VICT=[];document.getElementById('macroDesc').innerHTML='Cleared. Add rows or pick a macro.';refresh();return;}
+    var M=MACROS[m];if(!M)return; AGGR=M.A.map(function(r){return Object.assign({},r);}); VICT=M.V.map(function(r){return Object.assign({},r);});
+    document.getElementById('macroDesc').innerHTML='<b>'+b.textContent.trim()+'</b> — '+M.desc; refresh();});
+
+  ['aggrTbl','victTbl'].forEach(function(id){var el=document.getElementById(id);
+    el.addEventListener('input',preview);el.addEventListener('change',preview);
+    el.addEventListener('click',function(e){if(e.target.classList.contains('del')){var i=+e.target.closest('tr').dataset.i;
+      (id==='aggrTbl'?AGGR:VICT).splice(i,1);refresh();}});});
+  document.getElementById('addAggr').addEventListener('click',function(){AGGR.push(A('Else','NEW','PWM',1,5,1,50,150,35,5000));refresh();});
+  document.getElementById('addVict').addEventListener('click',function(){VICT.push(V('Else','NEW','analog-Vsense',10,1000,5,500,150,35,5000));refresh();});
+  document.getElementById('csvDl').addEventListener('click',function(){var b=new Blob([toCSV()],{type:'text/csv'}),u=URL.createObjectURL(b),
+    a=document.createElement('a');a.href=u;a.download='aggressor_victim_info.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},5000);
+    var m=document.getElementById('msg');m.textContent='✓ downloaded';setTimeout(function(){m.textContent='';},1800);});
+  document.getElementById('csvCopy').addEventListener('click',function(){var t=toCSV(),m=document.getElementById('msg');
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){m.textContent='✓ copied';setTimeout(function(){m.textContent='';},1800);});
+    else{document.getElementById('csvOut').select();m.textContent='select + copy ↓';}});
+
+  // start with the buck macro
+  AGGR=MACROS.buck.A.map(function(r){return Object.assign({},r);}); VICT=MACROS.buck.V.map(function(r){return Object.assign({},r);});
+  document.getElementById('macroDesc').innerHTML='<b>⚡ Multiphase Buck / Boost</b> — '+MACROS.buck.desc;
+  refresh();
+})();
+</script>
+</body></html>
