@@ -84,15 +84,16 @@ Worst-case coupling uses <b>dV max</b> and <b>R<sub>out</sub> min</b>.</p>
 <div style="font-size:12.5px;color:#5E6C84;margin-top:6px">🔎 <b>Filter</b> = the receiver front-end that rejects coupled HF noise (<code>all-pass</code> = none; <code>brick-LPF</code> / <code>1-pole RC</code> at <b>f<sub>c</sub></b>). Default <b>all-pass</b>; <b>ISEN_CS*</b> pads auto-set to a <b>10&nbsp;MHz brick-LPF</b>. Exported in the CSV (<code>filter, fc_MHz</code>).</div>
 </div>
 
-<h2>4 · Save / export</h2>
+<h2>4 · Load / save / export</h2>
 <div class="card">
+  <button class="btn" id="csvLoadBox">📥 Load from box ↓</button>
+  <label class="btn sec" style="cursor:pointer;text-decoration:none;display:inline-block">📂 Browse .csv<input type="file" id="csvFile" accept=".csv,.txt" style="display:none"></label>
   <button class="btn" id="csvCopy">📋 Copy CSV</button>
   <button class="btn" id="csvDl">📤 Download .csv</button>
   <a class="btn sec" href="https://borenw.github.io/inductive-crosstalk/#csvio" target="_blank" style="text-decoration:none;display:inline-block">↗ Open Crosstalk Checker</a>
   <span class="ok" id="msg"></span>
-  <div class="note" style="margin-top:10px">Paste this into the checker's <b>Import</b> box (or Download and Browse). Section markers
-  <code>#&nbsp;AGGRESSORS</code> / <code>#&nbsp;VICTIMS</code> and the header rows are what the parser reads; blank min/max cells fall back to the single value.</div>
-  <textarea id="csvOut" readonly></textarea>
+  <div class="note" style="margin-top:10px">On open, this page <b>auto-fills from <code>aggressor_victim_info.csv</code></b> in the same folder if it exists (else it shows the buck macro). Edit the tables above, or <b>paste a CSV below and Load</b> (or Browse a .csv) to replace them; <b>Download</b> writes that same file. Section markers <code>#&nbsp;AGGRESSORS</code>/<code>#&nbsp;VICTIMS</code> + header rows are read; unified column names (dV/Rout/Rin/Cin/filter/fc_MHz, aliases Va/R1/R2/C2 ok).</div>
+  <textarea id="csvOut"></textarea>
 </div>
 
 <footer><a href="https://borenw.github.io/" style="color:#0052CC;text-decoration:none;font-weight:600">Page 32 · Bo's Engineering Curriculum</a></footer>
@@ -172,6 +173,41 @@ Worst-case coupling uses <b>dV max</b> and <b>R<sub>out</sub> min</b>.</p>
     return a+'\n\n'+v+'\n';}
   function refresh(){renderAggr();renderVict();document.getElementById('csvOut').value=toCSV();}
   function preview(){document.getElementById('csvOut').value=toCSV();}
+  // ---------- CSV import ----------
+  function normHdr(x){return String(x).toLowerCase().replace(/[^a-z0-9]/g,'');}
+  var HMAP={ic:'ic',driveric:'ic',receiveric:'ic',rxic:'ic',pad:'pad',driverpad:'pad',rxpad:'pad',net:'pad',
+    'function':'fn',fn:'fn',dv:'dV',va:'dV',vagg:'dV',dvmin:'dVmin',dvmax:'dVmax',dvdt:'dVdt',dvdtvns:'dVdt',f:'f',fmhz:'f',
+    rout:'Rout',r1:'Rout',routmin:'Routmin',routmax:'Routmax',verr:'Verr',verrmv:'Verr',
+    filter:'filt',filt:'filt',fcmhz:'fc',fc:'fc',fcorner:'fc',
+    rin:'Rin',r2:'Rin',rinmin:'Rinmin',rinmax:'Rinmax',cin:'Cin',c2:'Cin',cinmin:'Cinmin',cinmax:'Cinmax',cinpf:'Cin',c2pf:'Cin',
+    d:'d',daggr:'d',paralleldtoaggr:'d',w:'w',wm:'w',t:'t',tm:'t',l:'len',len:'len',length:'len',lm:'len'};
+  function splitCSV(line){var o=[],c='',q=false;for(var i=0;i<line.length;i++){var ch=line[i];
+    if(ch==='"'){q=!q;}else if(ch===','&&!q){o.push(c);c='';}else c+=ch;}o.push(c);return o.map(function(s){return s.trim();});}
+  function icNorm(v){v=(v||'').toLowerCase();if(v==='1'||v.indexOf('controller')>=0)return 'Controller';if(v==='2'||v.indexOf('sps')>=0)return 'SPS';if(v==='3'||v.indexOf('host')>=0)return 'Host';return 'Else';}
+  function fnNorm(v){v=(v||'').toLowerCase().replace(/[^a-z]/g,'');for(var i=0;i<FN.length;i++){if(FN[i].toLowerCase().replace(/[^a-z]/g,'')===v)return FN[i];}return '';}
+  function newRecC(kind){return kind==='a'?A('Else','NEW','PWM',1,5,1,50,150,35,5000):V('Else','NEW','analog-Vsense',10,1000,5,500,150,35,5000);}
+  function rowToRec(cells,map,kind){var r=newRecC(kind);
+    cells.forEach(function(c,ix){var fld=map[ix];if(!fld)return;var v=(c||'').trim();
+      if(fld==='ic')r.ic=icNorm(v); else if(fld==='pad'){if(v)r.pad=v;} else if(fld==='fn'){var fn=fnNorm(v);if(fn)r.fn=fn;}
+      else if(fld==='filt'){if(v)r.filt=v;}
+      else if(/min$|max$/.test(fld)){r[fld]=(v===''||!isFinite(parseFloat(v)))?'':parseFloat(v);}
+      else{var n=parseFloat(v);if(isFinite(n))r[fld]=n;}});
+    return r;}
+  function parseCSV(text){var lines=text.split(/\r?\n/),sec=null,aH=null,vH=null,AA=[],VV=[];
+    lines.forEach(function(ln){var t=ln.trim();if(!t)return;
+      if(t.charAt(0)==='#'){var lo=t.toLowerCase();if(lo.indexOf('aggr')>=0)sec='a';else if(lo.indexOf('vict')>=0)sec='v';return;}
+      var cells=splitCSV(ln),joined=ln.toLowerCase();
+      var isHdr=/\b(ic|pad|function|rin|rout|verr|dv|filter)\b/.test(joined)&&cells.filter(function(c){return c&&isNaN(parseFloat(c));}).length>=3;
+      if(isHdr){var map=cells.map(function(c){return HMAP[normHdr(c)]||null;});
+        if(sec===null)sec=/rout/.test(joined)?'a':(/rin/.test(joined)?'v':null);
+        if(sec==='a')aH=map;else if(sec==='v')vH=map;return;}
+      if(sec==='a'&&aH)AA.push(rowToRec(cells,aH,'a'));else if(sec==='v'&&vH)VV.push(rowToRec(cells,vH,'v'));});
+    return {A:AA,V:VV};}
+  function applyCSV(text){var p=parseCSV(text),m=document.getElementById('msg');
+    if(p.A.length||p.V.length){if(p.A.length)AGGR=p.A;if(p.V.length)VICT=p.V;refresh();
+      m.style.color='#1f8a58';m.textContent='✓ loaded '+p.A.length+' aggressor'+(p.A.length!==1?'s':'')+' + '+p.V.length+' victim'+(p.V.length!==1?'s':'');
+      return true;}
+    m.style.color='#DE350B';m.textContent='⚠ no rows found — check headers / # markers';return false;}
 
   document.getElementById('macros').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var m=b.dataset.m;
     if(m==='clear'){AGGR=[];VICT=[];document.getElementById('macroDesc').innerHTML='Cleared. Add rows or pick a macro.';refresh();return;}
@@ -194,11 +230,17 @@ Worst-case coupling uses <b>dV max</b> and <b>R<sub>out</sub> min</b>.</p>
   document.getElementById('csvCopy').addEventListener('click',function(){var t=toCSV(),m=document.getElementById('msg');
     if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){m.textContent='✓ copied';setTimeout(function(){m.textContent='';},1800);});
     else{document.getElementById('csvOut').select();m.textContent='select + copy ↓';}});
+  document.getElementById('csvLoadBox').addEventListener('click',function(){applyCSV(document.getElementById('csvOut').value);});
+  document.getElementById('csvFile').addEventListener('change',function(e){var f=e.target.files[0];if(!f)return;
+    var rd=new FileReader();rd.onload=function(){document.getElementById('csvOut').value=rd.result;applyCSV(rd.result);};rd.readAsText(f);});
 
-  // start with the buck macro
-  AGGR=MACROS.buck.A.map(function(r){return Object.assign({},r);}); VICT=MACROS.buck.V.map(function(r){return Object.assign({},r);});
-  document.getElementById('macroDesc').innerHTML='<b>⚡ Multiphase Buck / Boost</b> — '+MACROS.buck.desc;
-  refresh();
+  // ---------- boot: auto-load aggressor_victim_info.csv from the same directory, else buck macro ----------
+  function bootBuck(){AGGR=MACROS.buck.A.map(function(r){return Object.assign({},r);});VICT=MACROS.buck.V.map(function(r){return Object.assign({},r);});
+    document.getElementById('macroDesc').innerHTML='<b>⚡ Multiphase Buck / Boost</b> — '+MACROS.buck.desc;refresh();}
+  fetch('aggressor_victim_info.csv',{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.text();})
+    .then(function(txt){ if(txt&&applyCSV(txt)){document.getElementById('macroDesc').innerHTML='<b>📄 Auto-loaded aggressor_victim_info.csv</b> — from the same folder. Pick a macro or edit to change.';}
+      else bootBuck(); })
+    .catch(function(){ bootBuck(); });
 })();
 </script>
 </body></html>

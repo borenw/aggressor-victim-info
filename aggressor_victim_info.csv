@@ -1,0 +1,13 @@
+# AGGRESSORS
+IC,pad,function,dV,dVmin,dVmax,dVdt,f,Rout,Routmin,Routmax,W,T,L
+Controller,PWM1_HDRV,PWM,5,,,10,1,100,,,30,10,4000
+Controller,PWM2_HDRV,PWM,5,,,10,1,100,,,30,10,4000
+SPS,SW_NODE,PWM,12,,,50,1,5,,,80,35,2000
+SPS,BOOT,PWM,12,,,20,1,20,,,40,35,1500
+
+# VICTIMS
+IC,pad,function,filter,fc_MHz,Verr,Rin,Rinmin,Rinmax,Cin,Cinmin,Cinmax,d,W,T,L
+Controller,ISEN_CS1,current-sense,brick-LPF,10,1,200,150,250,1,,,100,30,10,150
+Controller,ISEN_CS2,current-sense,brick-LPF,10,1,1000,,,1,,,100,30,10,150
+Controller,FB_VSEN,analog-Vsense,all-pass,,5,10000,,,10,,,300,30,10,800
+Controller,COMP_ITH,analog-Vsense,all-pass,,10,5000,,,100,,,300,30,10,800
